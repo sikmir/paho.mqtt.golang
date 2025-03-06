@@ -39,39 +39,43 @@ type route struct {
 // split.
 // The function determines if the topic string matches the route according to the MQTT topic rules
 // and returns a boolean of the outcome
-func match(route []string, topic []string) bool {
-	if len(route) == 0 {
-		return len(topic) == 0
+func matchSeq(routeSeq, topicSeq *strings.SplitSeq) bool {
+	routePart, routeOk := routeSeq.Next()
+	topicPart, topicOk := topicSeq.Next()
+
+	if !routeOk {
+		return !topicOk
 	}
 
-	if len(topic) == 0 {
-		return route[0] == "#"
+	if !topicOk {
+		return routePart == "#"
 	}
 
-	if route[0] == "#" {
+	if routePart == "#" {
 		return true
 	}
 
-	if (route[0] == "+") || (route[0] == topic[0]) {
-		return match(route[1:], topic[1:])
+	if routePart == "+" || routePart == topicPart {
+		return matchSeq(routeSeq, topicSeq)
 	}
 	return false
 }
 
 func routeIncludesTopic(route, topic string) bool {
-	return match(routeSplit(route), strings.Split(topic, "/"))
+	routeSeq := routeSplitSeq(route)
+	topicSeq := strings.SplitSeq(topic, "/")
+	return matchSeq(&routeSeq, &topicSeq)
 }
 
 // removes $share and sharename when splitting the route to allow
 // shared subscription routes to correctly match the topic
-func routeSplit(route string) []string {
-	var result []string
+func routeSplitSeq(route string) strings.SplitSeq {
+	seq := strings.SplitSeq(route, "/")
 	if strings.HasPrefix(route, "$share") {
-		result = strings.Split(route, "/")[2:]
-	} else {
-		result = strings.Split(route, "/")
+		_, _ = seq.Next()
+		_, _ = seq.Next()
 	}
-	return result
+	return seq
 }
 
 // match takes the topic string of the published message and does a basic compare to the
